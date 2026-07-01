@@ -323,7 +323,15 @@ static const key_code input_key_modifiers[] = {
 	KEYC_CTRL,
 	KEYC_SHIFT|KEYC_CTRL,
 	KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL,
-	KEYC_SHIFT|KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL
+	KEYC_SHIFT|KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL,
+	KEYC_SUPER,
+	KEYC_SHIFT|KEYC_SUPER,
+	KEYC_META|KEYC_IMPLIED_META|KEYC_SUPER,
+	KEYC_SHIFT|KEYC_META|KEYC_IMPLIED_META|KEYC_SUPER,
+	KEYC_CTRL|KEYC_SUPER,
+	KEYC_SHIFT|KEYC_CTRL|KEYC_SUPER,
+	KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL|KEYC_SUPER,
+	KEYC_SHIFT|KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL|KEYC_SUPER
 };
 
 /* Input key comparison function. */
@@ -366,6 +374,7 @@ input_key_build(void)
 	struct input_key_entry	*ike, *new;
 	u_int			 i, j;
 	char			*data;
+	const char		*underscore;
 	key_code		 key;
 
 	for (i = 0; i < nitems(input_key_defaults); i++) {
@@ -377,8 +386,9 @@ input_key_build(void)
 
 		for (j = 2; j < nitems(input_key_modifiers); j++) {
 			key = (ike->key & ~KEYC_BUILD_MODIFIERS);
-			data = xstrdup(ike->data);
-			data[strcspn(data, "_")] = '0' + j;
+			underscore = strchr(ike->data, '_');
+			xasprintf(&data, "%.*s%u%s", (int)(underscore - ike->data),
+			    ike->data, j, underscore + 1);
 
 			new = xcalloc(1, sizeof *new);
 			new->key = key|input_key_modifiers[j];
@@ -425,35 +435,23 @@ input_key_write(const char *from, struct bufferevent *bev, const char *data,
 static int
 input_key_extended(struct bufferevent *bev, key_code key)
 {
-	char		 tmp[64], modifier;
+	char		 tmp[64];
+	u_int		 modifier = 1;
 	struct utf8_data ud;
 	wchar_t		 wc;
 
-	switch (key & KEYC_MASK_MODIFIERS) {
-	case KEYC_SHIFT:
-		modifier = '2';
-		break;
-	case KEYC_META:
-		modifier = '3';
-		break;
-	case KEYC_SHIFT|KEYC_META:
-		modifier = '4';
-		break;
-	case KEYC_CTRL:
-		modifier = '5';
-		break;
-	case KEYC_SHIFT|KEYC_CTRL:
-		modifier = '6';
-		break;
-	case KEYC_META|KEYC_CTRL:
-		modifier = '7';
-		break;
-	case KEYC_SHIFT|KEYC_META|KEYC_CTRL:
-		modifier = '8';
-		break;
-	default:
+	if (key & KEYC_SHIFT)
+		modifier += 1;
+	if (key & KEYC_META)
+		modifier += 2;
+	if (key & KEYC_CTRL)
+		modifier += 4;
+	if (key & KEYC_SUPER)
+		modifier += 8;
+	if (modifier == 1 ||
+	    (key & KEYC_MASK_MODIFIERS &
+	    ~(KEYC_SHIFT|KEYC_META|KEYC_CTRL|KEYC_SUPER)) != 0)
 		return (-1);
-	}
 
 	if (KEYC_IS_UNICODE(key)) {
 		utf8_to_data(key & KEYC_MASK_KEY, &ud);
@@ -465,9 +463,9 @@ input_key_extended(struct bufferevent *bev, key_code key)
 		key &= KEYC_MASK_KEY;
 
 	if (options_get_number(global_options, "extended-keys-format") == 1)
-		xsnprintf(tmp, sizeof tmp, "\033[27;%c;%llu~", modifier, key);
+		xsnprintf(tmp, sizeof tmp, "\033[27;%u;%llu~", modifier, key);
 	else
-		xsnprintf(tmp, sizeof tmp, "\033[%llu;%cu", key, modifier);
+		xsnprintf(tmp, sizeof tmp, "\033[%llu;%uu", key, modifier);
 
 	input_key_write(__func__, bev, tmp, strlen(tmp));
 	return (0);
@@ -677,6 +675,10 @@ input_key(struct screen *s, struct bufferevent *bev, key_code key)
 		log_debug("%s: ignoring key 0x%llx", __func__, key);
 		return (0);
 	}
+
+	/* Super has no representation in non-extended-keys mode. */
+	if (key & KEYC_SUPER)
+		return (input_key_extended(bev, key));
 
 	/*
 	 * No builtin key sequence; construct an extended key sequence
