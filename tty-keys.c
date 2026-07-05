@@ -268,7 +268,14 @@ static const key_code tty_default_xterm_modifiers[] = {
 	KEYC_SHIFT|KEYC_CTRL,
 	KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL,
 	KEYC_SHIFT|KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL,
-	KEYC_META|KEYC_IMPLIED_META
+	KEYC_SUPER,
+	KEYC_SHIFT|KEYC_SUPER,
+	KEYC_META|KEYC_IMPLIED_META|KEYC_SUPER,
+	KEYC_SHIFT|KEYC_META|KEYC_IMPLIED_META|KEYC_SUPER,
+	KEYC_CTRL|KEYC_SUPER,
+	KEYC_SHIFT|KEYC_CTRL|KEYC_SUPER,
+	KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL|KEYC_SUPER,
+	KEYC_SHIFT|KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL|KEYC_SUPER
 };
 
 /*
@@ -495,6 +502,7 @@ tty_keys_build(struct tty *tty)
 	const struct tty_default_key_code	*tdkc;
 	u_int					 i, j;
 	const char				*s;
+	const char				*underscore;
 	struct options_entry			*o;
 	union options_value			*ov;
 	char					 copy[16];
@@ -507,8 +515,10 @@ tty_keys_build(struct tty *tty)
 	for (i = 0; i < nitems(tty_default_xterm_keys); i++) {
 		tdkx = &tty_default_xterm_keys[i];
 		for (j = 2; j < nitems(tty_default_xterm_modifiers); j++) {
-			strlcpy(copy, tdkx->template, sizeof copy);
-			copy[strcspn(copy, "_")] = '0' + j;
+			underscore = strchr(tdkx->template, '_');
+			xsnprintf(copy, sizeof copy, "%.*s%u%s",
+			    (int)(underscore - tdkx->template), tdkx->template,
+			    j, underscore + 1);
 
 			key = tdkx->key|tty_default_xterm_modifiers[j];
 			tty_keys_add(tty, copy, key);
@@ -1165,7 +1175,7 @@ tty_keys_extended_key(struct tty *tty, const char *buf, size_t len,
 		if (modifiers & 4)
 			nkey |= KEYC_CTRL;
 		if (modifiers & 8)
-			nkey |= (KEYC_META|KEYC_IMPLIED_META); /* Meta */
+			nkey |= KEYC_SUPER; /* Super */
 	}
 
 	/* Convert S-Tab into Backtab. */

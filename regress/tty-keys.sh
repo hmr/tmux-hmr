@@ -333,6 +333,16 @@ assert_key 'Escape [21@' 'C-S-F10'
 assert_key 'Escape [23@' 'C-S-F11'
 assert_key 'Escape [24@' 'C-S-F12'
 
+# Super and combinations with Super
+assert_key 'Escape [20;9~' 'U-F9'
+assert_key 'Escape [20;10~' 'S-U-F9'
+assert_key 'Escape [20;11~' 'M-U-F9'
+assert_key 'Escape [20;12~' 'M-S-U-F9'
+assert_key 'Escape [20;13~' 'C-U-F9'
+assert_key 'Escape [20;14~' 'C-S-U-F9'
+assert_key 'Escape [20;15~' 'C-M-U-F9'
+assert_key 'Escape [20;16~' 'C-M-S-U-F9'
+
 # Focus tracking
 assert_key 'Escape [I' 'FocusIn'
 assert_key 'Escape [O' 'FocusOut'
@@ -400,6 +410,23 @@ assert_extended_key () {
 
 # assert_key 'Escape [91;5u' 'C-['
 assert_key 'Escape [123;5u' 'C-{'
+
+assert_super_ascii () {
+	code=32
+	while [ $code -le 126 ]; do
+		if [ $code -eq 32 ]; then
+			key=Space
+		else
+			key=$(LC_ALL=C awk -v code="$code" 'BEGIN { printf "%c", code }')
+		fi
+
+		assert_key "Escape [${code};9u" "U-$key"
+		assert_key "Escape [27;9;${code}~" "U-$key"
+		code=$((code + 1))
+	done
+}
+
+assert_super_ascii
 
 # assert_key 'Escape [64;5u' 'C-@'
 

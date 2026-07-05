@@ -244,6 +244,37 @@ assert_key 'KP7' '7' -- 'M-KP7' '^[7'
 assert_key 'KP8' '8' -- 'M-KP8' '^[8'
 assert_key 'KP9' '9' -- 'M-KP9' '^[9'
 
+# Super has no standard representation, so it always uses an extended form.
+assert_super_ascii () {
+	format=$1
+	code=32
+	while [ $code -le 126 ]; do
+		if [ $code -eq 32 ]; then
+			key=Space
+		elif [ $code -eq 59 ]; then
+			key='\;'
+		else
+			key=$(LC_ALL=C awk -v code="$code" 'BEGIN { printf "%c", code }')
+		fi
+
+		case $format in
+		xterm)
+			expected_code="^[[27;9;${code}~"
+			;;
+		csi-u)
+			expected_code="^[[${code};9u"
+			;;
+		esac
+		assert_key "U-$key" "$expected_code"
+		code=$((code + 1))
+	done
+}
+
+assert_super_ascii xterm
+$TMUX set -g extended-keys-format csi-u
+assert_super_ascii csi-u
+$TMUX set -g extended-keys-format xterm
+
 # Extended keys
 $TMUX set -g extended-keys always
 
@@ -271,6 +302,30 @@ assert_extended_key () {
 
 	expected_code=$(printf '%s' "$expected_code_pattern" | sed -e 's/;_/;8/')
 	assert_key "S-C-M-$extended_key" "$expected_code"
+
+	expected_code=$(printf '%s' "$expected_code_pattern" | sed -e 's/;_/;9/')
+	assert_key "U-$extended_key" "$expected_code"
+
+	expected_code=$(printf '%s' "$expected_code_pattern" | sed -e 's/;_/;10/')
+	assert_key "S-U-$extended_key" "$expected_code"
+
+	expected_code=$(printf '%s' "$expected_code_pattern" | sed -e 's/;_/;11/')
+	assert_key "M-U-$extended_key" "$expected_code"
+
+	expected_code=$(printf '%s' "$expected_code_pattern" | sed -e 's/;_/;12/')
+	assert_key "S-M-U-$extended_key" "$expected_code"
+
+	expected_code=$(printf '%s' "$expected_code_pattern" | sed -e 's/;_/;13/')
+	assert_key "C-U-$extended_key" "$expected_code"
+
+	expected_code=$(printf '%s' "$expected_code_pattern" | sed -e 's/;_/;14/')
+	assert_key "S-C-U-$extended_key" "$expected_code"
+
+	expected_code=$(printf '%s' "$expected_code_pattern" | sed -e 's/;_/;15/')
+	assert_key "C-M-U-$extended_key" "$expected_code"
+
+	expected_code=$(printf '%s' "$expected_code_pattern" | sed -e 's/;_/;16/')
+	assert_key "S-C-M-U-$extended_key" "$expected_code"
 }
 
 ## Many of these pass without extended keys enabled -- are they extended keys?
