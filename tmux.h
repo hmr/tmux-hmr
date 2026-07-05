@@ -133,6 +133,7 @@ struct winlink;
 #define KEYC_META            0x00100000000000ULL
 #define KEYC_CTRL            0x00200000000000ULL
 #define KEYC_SHIFT           0x00400000000000ULL
+#define KEYC_SUPER           0x00800000000000ULL
 
 /* Key flag bits. */
 #define KEYC_LITERAL	     0x01000000000000ULL
